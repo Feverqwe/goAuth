@@ -11,10 +11,11 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/NYTimes/gziphandler"
 	"github.com/google/uuid"
-	lru "github.com/hashicorp/golang-lru"
+	expirable "github.com/hashicorp/golang-lru/v2/expirable"
 )
 
 type JsonFailResponse struct {
@@ -132,7 +133,7 @@ func handleAction(router *Router, config *Config, storage *Storage) {
 		return payload, nil
 	}
 
-	lru, _ := lru.New(128)
+	lru := expirable.NewLRU[string, bool](128, nil, time.Hour)
 	router.All("/auth", func(w http.ResponseWriter, r *http.Request) {
 		ok := false
 		cookies := r.Cookies()
@@ -141,7 +142,7 @@ func handleAction(router *Router, config *Config, storage *Storage) {
 				continue
 			}
 			if cachedResult, found := lru.Get(c.Value); found {
-				ok = cachedResult.(bool)
+				ok = cachedResult
 				break
 			}
 			if value, valid := UnsignCookie(c.Value, config.CookieSecret); valid {

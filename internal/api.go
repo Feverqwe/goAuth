@@ -208,16 +208,6 @@ func handleAction(router *Router, config *Config, storage *Storage) {
 	})
 }
 
-type ActionAny[T any] func() (T, error)
-
-func apiCall[T any](w http.ResponseWriter, action ActionAny[T]) {
-	result, err := action()
-	err = writeApiResult(w, result, err)
-	if err != nil {
-		panic(err)
-	}
-}
-
 func writeApiResult(w http.ResponseWriter, result interface{}, err error) error {
 	var statusCode int
 	var body interface{}
@@ -239,21 +229,6 @@ func writeApiResult(w http.ResponseWriter, result interface{}, err error) error 
 		_, err = w.Write(json)
 	}
 	return err
-}
-
-func sendStatus(w http.ResponseWriter, statusCode int) {
-	w.WriteHeader(statusCode)
-	_, err := w.Write(make([]byte, 0))
-	if err != nil {
-		panic(err)
-	}
-}
-
-func setValue[T int64 | string | bool](val *T, def T) T {
-	if val == nil {
-		return def
-	}
-	return *val
 }
 
 func ParseJson[T any](data io.Reader) (*T, error) {

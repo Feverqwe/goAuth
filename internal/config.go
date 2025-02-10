@@ -44,8 +44,15 @@ func (s *Config) GetBrowserAddress() string {
 
 func getNewConfig() Config {
 	var config = Config{
-		Port: 80,
-		Name: "Auth",
+		Port:              80,
+		Name:              "Auth",
+		RedirectUrl:       "https://example.com/callback",
+		DefultRedirectUrl: "https://example.com",
+		Login:             "username",
+		CookieKey:         "letmein",
+		CookieSecret:      "random",
+		CookieMaxAge:      7884000,
+		CookieDomain:      ".example.com",
 	}
 	return config
 }

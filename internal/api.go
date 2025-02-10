@@ -133,7 +133,7 @@ func handleAction(router *Router, config *Config, storage *Storage) {
 		return payload, nil
 	}
 
-	lru := expirable.NewLRU[string, bool](128, nil, time.Hour)
+	cache := expirable.NewLRU[string, bool](128, nil, time.Hour)
 	router.All("/auth", func(w http.ResponseWriter, r *http.Request) {
 		ok := false
 		cookies := r.Cookies()
@@ -141,14 +141,14 @@ func handleAction(router *Router, config *Config, storage *Storage) {
 			if c.Name != config.CookieKey {
 				continue
 			}
-			if cachedResult, found := lru.Get(c.Value); found {
+			if cachedResult, found := cache.Get(c.Value); found {
 				ok = cachedResult
 				break
 			}
 			if value, valid := UnsignCookie(c.Value, config.CookieSecret); valid {
 				ok = storage.HasKey(value)
 			}
-			lru.Add(c.Value, ok)
+			cache.Add(c.Value, ok)
 			break
 		}
 

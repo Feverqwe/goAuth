@@ -138,11 +138,9 @@ func handleAction(router *Router, config *Config, storage *Storage) {
 			if c.Name != config.CookieKey {
 				continue
 			}
-			value, isOk := UnsignCookie(c.Value, config.CookieSecret)
-			if !isOk {
-				break
+			if value, valid := UnsignCookie(c.Value, config.CookieSecret); valid {
+				ok = storage.HasKey(value)
 			}
-			ok = storage.HasKey(value)
 			break
 		}
 
@@ -196,9 +194,11 @@ func handleAction(router *Router, config *Config, storage *Storage) {
 		}
 
 		if i.Login == config.Login {
-			value := SignCookie(uuid.New().String(), config.CookieSecret)
+			value := uuid.New().String()
+			sigValue := SignCookie(value, config.CookieSecret)
 			storage.SetKey(value, config.Login)
-			w.Header().Add("Set-Cookie", fmt.Sprintf("%s=%s;Max-Age=%s;Domain=%s;Path=/;Secure;HttpOnly", config.CookieKey, value, strconv.Itoa(config.CookieMaxAge), config.CookieDomain))
+			storage.Save()
+			w.Header().Add("Set-Cookie", fmt.Sprintf("%s=%s;Max-Age=%s;Domain=%s;Path=/;Secure;HttpOnly", config.CookieKey, sigValue, strconv.Itoa(config.CookieMaxAge), config.CookieDomain))
 			w.Header().Add("Location", stateQuery.Get("origin"))
 			w.WriteHeader(307)
 			return

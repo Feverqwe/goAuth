@@ -76,7 +76,7 @@ func handleAction(router *Router, config *Config, storage *Storage) {
 
 		contentType := resp.Header.Get("Content-type")
 
-		if strings.HasPrefix(contentType, "text/plain") {
+		if !strings.HasPrefix(contentType, "application/json") {
 			data, _ := io.ReadAll(resp.Body)
 			return nil, errors.New(string(data))
 		}
@@ -118,7 +118,7 @@ func handleAction(router *Router, config *Config, storage *Storage) {
 
 		contentType := resp.Header.Get("Content-type")
 
-		if strings.HasPrefix(contentType, "text/plain") {
+		if !strings.HasPrefix(contentType, "application/json") {
 			data, _ := io.ReadAll(resp.Body)
 			return nil, errors.New(string(data))
 		}

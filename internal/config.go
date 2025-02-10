@@ -14,18 +14,18 @@ import (
 )
 
 type Config struct {
-	Port              int    `json:"port"`
-	Address           string `json:"address"`
-	Name              string `json:"name"`
-	ClientId          string `json:"clientId"`
-	ClientSecter      string `json:"clientSecret"`
-	RedirectUrl       string `json:"redirectUrl"`
-	DefultRedirectUrl string `json:"defultRedirectUrl"`
-	Login             string `json:"login"`
-	CookieKey         string `json:"cookieKey"`
-	CookieSecret      string `json:"cookieSecret"`
-	CookieMaxAge      int    `json:"cookieMaxAge"`
-	CookieDomain      string `json:"cookieDomain"`
+	Port              int      `json:"port"`
+	Address           string   `json:"address"`
+	Name              string   `json:"name"`
+	ClientId          string   `json:"clientId"`
+	ClientSecter      string   `json:"clientSecret"`
+	RedirectUrl       string   `json:"redirectUrl"`
+	DefultRedirectUrl string   `json:"defultRedirectUrl"`
+	Logins            []string `json:"logins"`
+	CookieKey         string   `json:"cookieKey"`
+	CookieSecret      string   `json:"cookieSecret"`
+	CookieMaxAge      int      `json:"cookieMaxAge"`
+	CookieDomain      string   `json:"cookieDomain"`
 }
 
 var APP_ID = "com.rndnm.goauth"
@@ -48,7 +48,6 @@ func getNewConfig() Config {
 		Name:              "Auth",
 		RedirectUrl:       "https://example.com/callback",
 		DefultRedirectUrl: "https://example.com",
-		Login:             "username",
 		CookieKey:         "letmein",
 		CookieSecret:      "random",
 		CookieMaxAge:      7884000,

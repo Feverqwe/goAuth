@@ -29,3 +29,12 @@ func UnsignCookie(valueHash string, secret string) (string, bool) {
 	ok := SignCookie(value, secret) == valueHash
 	return value, ok
 }
+
+func Contains(arr []string, value string) bool {
+	for _, i := range arr {
+		if i == value {
+			return true
+		}
+	}
+	return false
+}

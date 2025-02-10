@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/NYTimes/gziphandler"
+	"github.com/google/uuid"
 )
 
 type JsonFailResponse struct {
@@ -23,11 +24,11 @@ type JsonSuccessResponse struct {
 	Result interface{} `json:"result"`
 }
 
-func HandleApi(router *Router, config *Config) {
+func HandleApi(router *Router, config *Config, storage *Storage) {
 	apiRouter := NewRouter()
 	gzipHandler := gziphandler.GzipHandler(apiRouter)
 
-	handleAction(apiRouter, config)
+	handleAction(apiRouter, config, storage)
 	handleFobidden(apiRouter)
 
 	router.All("^/", gzipHandler.ServeHTTP)
@@ -39,7 +40,7 @@ func handleFobidden(router *Router) {
 	})
 }
 
-func handleAction(router *Router, config *Config) {
+func handleAction(router *Router, config *Config, storage *Storage) {
 	type Token struct {
 		ErrorDescription string `json:"error_description"`
 		Error            string `json:"error"`
@@ -137,7 +138,11 @@ func handleAction(router *Router, config *Config) {
 			if c.Name != config.CookieKey {
 				continue
 			}
-			ok = c.Value == config.CookieValue
+			value, isOk := UnsignCookie(c.Value, config.CookieSecret)
+			if !isOk {
+				break
+			}
+			ok = storage.HasKey(value)
 			break
 		}
 
@@ -191,7 +196,9 @@ func handleAction(router *Router, config *Config) {
 		}
 
 		if i.Login == config.Login {
-			w.Header().Add("Set-Cookie", fmt.Sprintf("%s=%s;Max-Age=%s;Domain=%s;Path=/;Secure;HttpOnly", config.CookieKey, config.CookieValue, strconv.Itoa(config.CookieMaxAge), config.CookieDomain))
+			value := SignCookie(uuid.New().String(), config.CookieSecret)
+			storage.SetKey(value, config.Login)
+			w.Header().Add("Set-Cookie", fmt.Sprintf("%s=%s;Max-Age=%s;Domain=%s;Path=/;Secure;HttpOnly", config.CookieKey, value, strconv.Itoa(config.CookieMaxAge), config.CookieDomain))
 			w.Header().Add("Location", stateQuery.Get("origin"))
 			w.WriteHeader(307)
 			return

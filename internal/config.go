@@ -23,7 +23,7 @@ type Config struct {
 	DefultRedirectUrl string `json:"defultRedirectUrl"`
 	Login             string `json:"login"`
 	CookieKey         string `json:"cookieKey"`
-	CookieValue       string `json:"cookieValue"`
+	CookieSecret      string `json:"cookieSecret"`
 	CookieMaxAge      int    `json:"cookieMaxAge"`
 	CookieDomain      string `json:"cookieDomain"`
 }

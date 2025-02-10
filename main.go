@@ -4,17 +4,15 @@ import (
 	"goAuth/internal"
 	"log"
 	"net/http"
-	"os"
 )
 
-var DEBUG_UI = os.Getenv("DEBUG_UI") == "1"
-
 func main() {
-	var config = internal.LoadConfig()
+	config := internal.LoadConfig()
 
+	storage := internal.GetStorage(internal.GetStoragePath())
 	router := internal.NewRouter()
 
-	internal.HandleApi(router, &config)
+	internal.HandleApi(router, &config, storage)
 
 	address := config.GetAddress()
 

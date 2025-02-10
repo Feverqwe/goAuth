@@ -14,6 +14,7 @@ import (
 
 	"github.com/NYTimes/gziphandler"
 	"github.com/google/uuid"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 type JsonFailResponse struct {
@@ -131,6 +132,7 @@ func handleAction(router *Router, config *Config, storage *Storage) {
 		return payload, nil
 	}
 
+	lru, _ := lru.New(128)
 	router.All("/auth", func(w http.ResponseWriter, r *http.Request) {
 		ok := false
 		cookies := r.Cookies()
@@ -138,9 +140,14 @@ func handleAction(router *Router, config *Config, storage *Storage) {
 			if c.Name != config.CookieKey {
 				continue
 			}
+			if cachedResult, found := lru.Get(c.Value); found {
+				ok = cachedResult.(bool)
+				break
+			}
 			if value, valid := UnsignCookie(c.Value, config.CookieSecret); valid {
 				ok = storage.HasKey(value)
 			}
+			lru.Add(c.Value, ok)
 			break
 		}
 

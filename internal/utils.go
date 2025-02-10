@@ -16,7 +16,8 @@ func SignCookie(value string, secret string) string {
 	mac.Write([]byte(value))
 	hash := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 	trimmedHash := RE.ReplaceAllString(hash, "")
-	return fmt.Sprintf("%s.%s", value, trimmedHash)
+	hashValue := fmt.Sprintf("%s.%s", value, trimmedHash)
+	return hashValue
 }
 
 func UnsignCookie(valueHash string, secret string) (string, bool) {

@@ -24,6 +24,7 @@ type Config struct {
 	Logins            []string `json:"logins"`
 	CookieKey         string   `json:"cookieKey"`
 	CookieSecret      string   `json:"cookieSecret"`
+	CookieSalt        string   `json:"cookieSalt"`
 	CookieMaxAge      int      `json:"cookieMaxAge"`
 	CookieDomain      string   `json:"cookieDomain"`
 }

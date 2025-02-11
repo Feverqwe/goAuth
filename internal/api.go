@@ -145,7 +145,7 @@ func handleAction(router *Router, config *Config, storage *Storage) {
 				ok = cachedResult
 				break
 			}
-			if value, valid := UnsignCookie(c.Value, config.CookieSecret); valid {
+			if value, valid := UnsignCookie(c.Value, config.CookieSecret, config.CookieSalt); valid {
 				if login, found := storage.GetKey(value); found {
 					ok = Contains(config.Logins, login.(string))
 				}
@@ -205,7 +205,7 @@ func handleAction(router *Router, config *Config, storage *Storage) {
 
 		if Contains(config.Logins, i.Login) {
 			value := uuid.New().String()
-			sigValue := SignCookie(value, config.CookieSecret)
+			sigValue := SignCookie(value, config.CookieSecret, config.CookieSalt)
 			storage.SetKey(value, i.Login)
 			storage.Save()
 			w.Header().Add("Set-Cookie", fmt.Sprintf("%s=%s;Max-Age=%s;Domain=%s;Path=/;Secure;HttpOnly", config.CookieKey, sigValue, strconv.Itoa(config.CookieMaxAge), config.CookieDomain))

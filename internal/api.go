@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/NYTimes/gziphandler"
-	"github.com/google/uuid"
 	expirable "github.com/hashicorp/golang-lru/v2/expirable"
 )
 
@@ -26,11 +25,11 @@ type JsonSuccessResponse struct {
 	Result interface{} `json:"result"`
 }
 
-func HandleApi(router *Router, config *Config, storage *Storage) {
+func HandleApi(router *Router, config *Config) {
 	apiRouter := NewRouter()
 	gzipHandler := gziphandler.GzipHandler(apiRouter)
 
-	handleAction(apiRouter, config, storage)
+	handleAction(apiRouter, config)
 	handleFobidden(apiRouter)
 
 	router.All("^/", gzipHandler.ServeHTTP)
@@ -42,7 +41,7 @@ func handleFobidden(router *Router) {
 	})
 }
 
-func handleAction(router *Router, config *Config, storage *Storage) {
+func handleAction(router *Router, config *Config) {
 	type Token struct {
 		ErrorDescription string `json:"error_description"`
 		Error            string `json:"error"`
@@ -145,10 +144,8 @@ func handleAction(router *Router, config *Config, storage *Storage) {
 				ok = cachedResult
 				break
 			}
-			if value, valid := UnsignCookie(c.Value, config.CookieSecret, config.CookieSalt); valid {
-				if login, found := storage.GetKey(value); found {
-					ok = Contains(config.Logins, login.(string))
-				}
+			if login, valid := UnsignCookie(c.Value, config.CookieSecret, config.CookieSalt); valid {
+				ok = Contains(config.Logins, login)
 			}
 			cache.Add(c.Value, ok)
 			break
@@ -204,10 +201,8 @@ func handleAction(router *Router, config *Config, storage *Storage) {
 		}
 
 		if Contains(config.Logins, i.Login) {
-			value := uuid.New().String()
-			sigValue := SignCookie(value, config.CookieSecret, config.CookieSalt)
-			storage.SetKey(value, i.Login)
-			storage.Save()
+			ts := strconv.FormatInt(time.Now().UnixMilli(), 10)
+			sigValue := SignCookie(i.Login, ts, config.CookieSecret, config.CookieSalt)
 			w.Header().Add("Set-Cookie", fmt.Sprintf("%s=%s;Max-Age=%s;Domain=%s;Path=/;Secure;HttpOnly", config.CookieKey, sigValue, strconv.Itoa(config.CookieMaxAge), config.CookieDomain))
 			w.Header().Add("Location", stateQuery.Get("origin"))
 			w.WriteHeader(307)

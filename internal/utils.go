@@ -11,23 +11,24 @@ import (
 
 var RE = regexp.MustCompile(`=*$`)
 
-func SignCookie(value string, secret string, salt string) string {
+func SignCookie(payload string, ts string, secret string, salt string) (payloadHash string) {
 	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(value + salt))
+	mac.Write([]byte(payload + salt))
 	hash := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 	trimmedHash := RE.ReplaceAllString(hash, "")
-	hashValue := fmt.Sprintf("%s.%s", value, trimmedHash)
-	return hashValue
+	payloadHash = fmt.Sprintf("%s.%s.%s", ts, payload, trimmedHash)
+	return
 }
 
-func UnsignCookie(valueHash string, secret string, salt string) (string, bool) {
-	p := strings.SplitN(valueHash, ".", 2)
-	if len(p) != 2 {
-		return "", false
+func UnsignCookie(payloadHash string, secret string, salt string) (payload string, ok bool) {
+	p := strings.SplitN(payloadHash, ".", 3)
+	if len(p) != 3 {
+		return payload, ok
 	}
-	value := p[0]
-	ok := SignCookie(value, secret, salt) == valueHash
-	return value, ok
+	ts := p[0]
+	payload = p[1]
+	ok = SignCookie(payload, ts, secret, salt) == payloadHash
+	return
 }
 
 func Contains(arr []string, value string) bool {

@@ -9,10 +9,9 @@ import (
 func main() {
 	config := internal.LoadConfig()
 
-	storage := internal.GetStorage(internal.GetStoragePath())
 	router := internal.NewRouter()
 
-	internal.HandleApi(router, &config, storage)
+	internal.HandleApi(router, &config)
 
 	address := config.GetAddress()
 

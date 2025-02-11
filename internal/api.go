@@ -32,7 +32,7 @@ func HandleApi(router *Router, config *Config) {
 	handleAction(apiRouter, config)
 	handleFobidden(apiRouter)
 
-	router.All("^/", gzipHandler.ServeHTTP)
+	router.Use(gzipHandler.ServeHTTP)
 }
 
 func handleFobidden(router *Router) {

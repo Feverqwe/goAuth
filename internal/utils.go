@@ -16,7 +16,7 @@ func SignCookie(payload string, ts string, secret string, salt string) (payloadH
 	mac.Write([]byte(payload + salt))
 	hash := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 	trimmedHash := RE.ReplaceAllString(hash, "")
-	payloadHash = fmt.Sprintf("%s.%s.%s", ts, payload, trimmedHash)
+	payloadHash = fmt.Sprintf("%s.%s.%s", ts, trimmedHash, payload)
 	return
 }
 
@@ -26,7 +26,7 @@ func UnsignCookie(payloadHash string, secret string, salt string) (payload strin
 		return payload, ok
 	}
 	ts := p[0]
-	payload = p[1]
+	payload = p[2]
 	ok = SignCookie(payload, ts, secret, salt) == payloadHash
 	return
 }

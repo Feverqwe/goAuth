@@ -13,7 +13,7 @@ var RE = regexp.MustCompile(`=*$`)
 
 func SignCookie(payload string, ts string, secret string, salt string) (payloadHash string) {
 	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(payload + salt))
+	mac.Write([]byte(ts + payload + salt))
 	hash := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 	trimmedHash := RE.ReplaceAllString(hash, "")
 	payloadHash = fmt.Sprintf("%s.%s.%s", ts, trimmedHash, payload)

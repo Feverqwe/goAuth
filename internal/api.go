@@ -163,6 +163,10 @@ func handleAction(router *Router, config *Config) {
 		if origin == "" {
 			origin = config.DefultRedirectUrl
 		}
+		if origin == "" {
+			w.WriteHeader(403)
+			return
+		}
 
 		l := fmt.Sprintf("https://oauth.yandex.ru/authorize?response_type=%s&client_id=%s&redirect_uri=%s&state=%s",
 			url.QueryEscape("code"),

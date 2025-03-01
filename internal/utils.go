@@ -6,7 +6,9 @@ import (
 	"encoding/base64"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 )
 
 var RE = regexp.MustCompile(`=*$`)
@@ -20,14 +22,24 @@ func SignCookie(payload string, ts string, secret string, salt string) (payloadH
 	return
 }
 
-func UnsignCookie(payloadHash string, secret string, salt string) (payload string, ok bool) {
+func UnsignCookie(payloadHash string, secret string, salt string, ttl int) (payload string, ok bool) {
 	p := strings.SplitN(payloadHash, ".", 3)
 	if len(p) != 3 {
 		return payload, ok
 	}
-	ts := p[0]
+	tsStr := p[0]
 	payload = p[2]
-	ok = SignCookie(payload, ts, secret, salt) == payloadHash
+	if ts, err := strconv.ParseInt(tsStr, 10, 64); err == nil {
+		now := time.Now().UnixMilli()
+		if now-ts > int64(ttl)*1000 {
+			ok = false
+			return
+		}
+	} else {
+		ok = false
+		return
+	}
+	ok = SignCookie(payload, tsStr, secret, salt) == payloadHash
 	return
 }
 

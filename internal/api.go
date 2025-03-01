@@ -144,7 +144,7 @@ func handleAction(router *Router, config *Config) {
 				ok = cachedResult
 				break
 			}
-			if login, valid := UnsignCookie(c.Value, config.CookieSecret, config.CookieSalt); valid {
+			if login, valid := UnsignCookie(c.Value, config.CookieSecret, config.CookieSalt, config.CookieMaxAge); valid {
 				ok = Contains(config.Logins, login)
 			}
 			cache.Add(c.Value, ok)

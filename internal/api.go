@@ -153,7 +153,7 @@ func handleAction(router *Router, config *Config) {
 			return
 		}
 
-		now := time.Now()
+		now := time.Now().Local()
 		m := fmt.Sprintf("New login. User `%s` login into your web site on %s at %s.", i.Login, now.Format("02-01-2006"), now.Format("15:04:05"))
 		j, err := json.Marshal(TPayload{
 			ChatId:    config.TelegramChatId,

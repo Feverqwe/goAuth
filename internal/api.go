@@ -138,18 +138,20 @@ func handleAction(router *Router, config *Config) {
 		ok := false
 		cookies := r.Cookies()
 		for _, c := range cookies {
+			if ok {
+				break
+			}
 			if c.Name != config.CookieKey {
 				continue
 			}
 			if cachedResult, found := cache.Get(c.Value); found {
 				ok = cachedResult
-				break
+				continue
 			}
 			if login, valid := UnsignCookie(c.Value, config.CookieSecret, config.CookieSalt, config.CookieMaxAge); valid {
 				ok = slices.Contains(config.Logins, login)
 			}
 			cache.Add(c.Value, ok)
-			break
 		}
 
 		if ok {

@@ -25,29 +25,18 @@ func SignCookie(payload string, ts string, secret string, salt string) (payloadH
 func UnsignCookie(payloadHash string, secret string, salt string, ttl int) (payload string, ok bool) {
 	p := strings.SplitN(payloadHash, ".", 3)
 	if len(p) != 3 {
-		return payload, ok
+		return
 	}
 	tsStr := p[0]
 	payload = p[2]
-	if ts, err := strconv.ParseInt(tsStr, 10, 64); err == nil {
-		now := time.Now().UnixMilli()
-		if now-ts > int64(ttl)*1000 {
-			ok = false
-			return
-		}
-	} else {
-		ok = false
+	ts, err := strconv.ParseInt(tsStr, 10, 64)
+	if err != nil {
+		return
+	}
+	now := time.Now().UnixMilli()
+	if now-ts > int64(ttl)*1000 {
 		return
 	}
 	ok = SignCookie(payload, tsStr, secret, salt) == payloadHash
 	return
-}
-
-func Contains(arr []string, value string) bool {
-	for _, i := range arr {
-		if i == value {
-			return true
-		}
-	}
-	return false
 }

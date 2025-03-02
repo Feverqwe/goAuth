@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -22,7 +23,7 @@ type JsonFailResponse struct {
 }
 
 type JsonSuccessResponse struct {
-	Result interface{} `json:"result"`
+	Result any `json:"result"`
 }
 
 func HandleApi(router *Router, config *Config) {
@@ -64,9 +65,9 @@ func handleAction(router *Router, config *Config) {
 			return nil, err
 		}
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-		b := base64.StdEncoding.EncodeToString([]byte(
-			fmt.Sprintf("%s:%s", config.ClientId, config.ClientSecter),
-		))
+		b := base64.StdEncoding.EncodeToString(
+			fmt.Appendf(nil, "%s:%s", config.ClientId, config.ClientSecter),
+		)
 		req.Header.Add("Authorization", fmt.Sprintf("Basic %s", b))
 
 		resp, err := http.DefaultClient.Do(req)
@@ -145,7 +146,7 @@ func handleAction(router *Router, config *Config) {
 				break
 			}
 			if login, valid := UnsignCookie(c.Value, config.CookieSecret, config.CookieSalt, config.CookieMaxAge); valid {
-				ok = Contains(config.Logins, login)
+				ok = slices.Contains(config.Logins, login)
 			}
 			cache.Add(c.Value, ok)
 			break
@@ -204,7 +205,7 @@ func handleAction(router *Router, config *Config) {
 			return
 		}
 
-		if Contains(config.Logins, i.Login) {
+		if slices.Contains(config.Logins, i.Login) {
 			ts := strconv.FormatInt(time.Now().UnixMilli(), 10)
 			sigValue := SignCookie(i.Login, ts, config.CookieSecret, config.CookieSalt)
 			w.Header().Add("Set-Cookie", fmt.Sprintf("%s=%s;Max-Age=%s;Domain=%s;Path=/;Secure;HttpOnly", config.CookieKey, sigValue, strconv.Itoa(config.CookieMaxAge), config.CookieDomain))

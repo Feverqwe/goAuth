@@ -27,6 +27,8 @@ type Config struct {
 	CookieSalt        string   `json:"cookieSalt"`
 	CookieMaxAge      int      `json:"cookieMaxAge"`
 	CookieDomain      string   `json:"cookieDomain"`
+	TelegramBotToken  string   `json:"telegramBotToken"`
+	TelegramChatId    string   `json:"telegramChatId"`
 }
 
 var APP_ID = "com.rndnm.goauth"

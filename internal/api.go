@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"slices"
@@ -99,7 +100,10 @@ func handleAction(router *Router, config *Config) {
 	}
 
 	type UserInfo struct {
-		Login string `json:"login"`
+		Login    string `json:"login"`
+		Id       string `json:"id"`
+		ClientId string `json:"client_id"`
+		Psuid    string `json:"psuid"`
 	}
 
 	getUserInfo := func(token string) (*UserInfo, error) {
@@ -131,6 +135,67 @@ func handleAction(router *Router, config *Config) {
 		}
 
 		return payload, nil
+	}
+
+	type TPayload struct {
+		ChatId    string `json:"chat_id"`
+		Text      string `json:"text"`
+		ParseMode string `json:"parse_mode"`
+	}
+
+	type TResponse struct {
+		Ok          bool   `json:"ok"`
+		Description string `json:"description"`
+	}
+
+	sendNotify := func(i *UserInfo) (err error) {
+		if config.TelegramBotToken == "" || config.TelegramChatId == "" {
+			return
+		}
+
+		now := time.Now()
+		m := fmt.Sprintf("New login. User `%s` login into your web site on %s at %s.", i.Login, now.Format("02-01-2006"), now.Format("15:04:05"))
+		j, err := json.Marshal(TPayload{
+			ChatId:    config.TelegramChatId,
+			Text:      m,
+			ParseMode: "Markdown",
+		})
+		if err != nil {
+			return
+		}
+
+		u := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", config.TelegramBotToken)
+		req, err := http.NewRequest("POST", u, bytes.NewBuffer(j))
+		if err != nil {
+			return
+		}
+		req.Header.Add("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return
+		}
+		defer resp.Body.Close()
+
+		contentType := resp.Header.Get("Content-type")
+
+		if !strings.HasPrefix(contentType, "application/json") {
+			data, _ := io.ReadAll(resp.Body)
+			err = errors.New(string(data))
+			return
+		}
+
+		payload, err := ParseJson[TResponse](resp.Body)
+		if err != nil {
+			return
+		}
+
+		if !payload.Ok {
+			err = errors.New(fmt.Sprintf("Telegram error: %s", payload.Description))
+			return
+		}
+
+		return
 	}
 
 	cache := expirable.NewLRU[string, bool](128, nil, time.Hour)
@@ -211,6 +276,10 @@ func handleAction(router *Router, config *Config) {
 			w.Header().Add("Set-Cookie", fmt.Sprintf("%s=%s;Max-Age=%s;Domain=%s;Path=/;Secure;HttpOnly", config.CookieKey, sigValue, strconv.Itoa(config.CookieMaxAge), config.CookieDomain))
 			w.Header().Add("Location", stateQuery.Get("origin"))
 			w.WriteHeader(307)
+
+			if err := sendNotify(i); err != nil {
+				log.Println("Unable send notiy", err)
+			}
 			return
 		}
 

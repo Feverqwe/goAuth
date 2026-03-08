@@ -227,7 +227,7 @@ func handleAction(router *Router, config *Config) {
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		origin := r.URL.Query().Get("origin")
 		if origin == "" {
-			origin = config.DefultRedirectUrl
+			origin = config.DefaultRedirectUrl
 		}
 		if origin == "" {
 			w.WriteHeader(403)

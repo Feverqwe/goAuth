@@ -51,7 +51,7 @@ server {
   "clientId": "your_yandex_client_id",
   "clientSecret": "your_yandex_client_secret",
   "redirectUrl": "https://auth.example.com/callback",
-  "defultRedirectUrl": "https://example.com",
+  "defaultRedirectUrl": "https://example.com",
   "logins": ["allowed_user1", "allowed_user2"],
   "cookieKey": "auth_token",
   "cookieSecret": "secure_secret",

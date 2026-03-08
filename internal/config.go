@@ -14,21 +14,21 @@ import (
 )
 
 type Config struct {
-	Port              int      `json:"port"`
-	Address           string   `json:"address"`
-	Name              string   `json:"name"`
-	ClientId          string   `json:"clientId"`
-	ClientSecter      string   `json:"clientSecret"`
-	RedirectUrl       string   `json:"redirectUrl"`
-	DefultRedirectUrl string   `json:"defultRedirectUrl"`
-	Logins            []string `json:"logins"`
-	CookieKey         string   `json:"cookieKey"`
-	CookieSecret      string   `json:"cookieSecret"`
-	CookieSalt        string   `json:"cookieSalt"`
-	CookieMaxAge      int      `json:"cookieMaxAge"`
-	CookieDomain      string   `json:"cookieDomain"`
-	TelegramBotToken  string   `json:"telegramBotToken"`
-	TelegramChatId    string   `json:"telegramChatId"`
+	Port               int      `json:"port"`
+	Address            string   `json:"address"`
+	Name               string   `json:"name"`
+	ClientId           string   `json:"clientId"`
+	ClientSecter       string   `json:"clientSecret"`
+	RedirectUrl        string   `json:"redirectUrl"`
+	DefaultRedirectUrl string   `json:"defaultRedirectUrl"`
+	Logins             []string `json:"logins"`
+	CookieKey          string   `json:"cookieKey"`
+	CookieSecret       string   `json:"cookieSecret"`
+	CookieSalt         string   `json:"cookieSalt"`
+	CookieMaxAge       int      `json:"cookieMaxAge"`
+	CookieDomain       string   `json:"cookieDomain"`
+	TelegramBotToken   string   `json:"telegramBotToken"`
+	TelegramChatId     string   `json:"telegramChatId"`
 }
 
 var APP_ID = "com.rndnm.goauth"
@@ -47,14 +47,14 @@ func (s *Config) GetBrowserAddress() string {
 
 func getNewConfig() Config {
 	var config = Config{
-		Port:              80,
-		Name:              "Auth",
-		RedirectUrl:       "https://example.com/callback",
-		DefultRedirectUrl: "https://example.com",
-		CookieKey:         "letmein",
-		CookieSecret:      "random",
-		CookieMaxAge:      7884000,
-		CookieDomain:      ".example.com",
+		Port:               80,
+		Name:               "Auth",
+		RedirectUrl:        "https://example.com/callback",
+		DefaultRedirectUrl: "https://example.com",
+		CookieKey:          "letmein",
+		CookieSecret:       "random",
+		CookieMaxAge:       7884000,
+		CookieDomain:       ".example.com",
 	}
 	return config
 }

@@ -17,7 +17,6 @@ import (
 type Config struct {
 	Port               int                 `yaml:"port"`
 	Address            string              `yaml:"address"`
-	Name               string              `yaml:"name"`
 	ClientId           string              `yaml:"clientId"`
 	ClientSecret       string              `yaml:"clientSecret"`
 	RedirectUrl        string              `yaml:"redirectUrl"`
@@ -52,7 +51,6 @@ func (s *Config) GetBrowserAddress() string {
 func getNewConfig() Config {
 	var config = Config{
 		Port:               80,
-		Name:               "Auth",
 		RedirectUrl:        "https://example.com/callback",
 		DefaultRedirectUrl: "https://example.com",
 		CookieKey:          "letmein",

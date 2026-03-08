@@ -2,7 +2,6 @@ package internal
 
 import (
 	"bytes"
-	"encoding/json"
 	"log"
 	"os"
 	"path/filepath"
@@ -12,27 +11,28 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/natefinch/atomic"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	Port               int                 `json:"port"`
-	Address            string              `json:"address"`
-	Name               string              `json:"name"`
-	ClientId           string              `json:"clientId"`
-	ClientSecter       string              `json:"clientSecret"`
-	RedirectUrl        string              `json:"redirectUrl"`
-	DefaultRedirectUrl string              `json:"defaultRedirectUrl"`
-	Logins             []string            `json:"logins"`
-	CookieKey          string              `json:"cookieKey"`
-	CookieSecret       string              `json:"cookieSecret"`
-	CookieSalt         string              `json:"cookieSalt"`
-	CookieMaxAge       int                 `json:"cookieMaxAge"`
-	CookieDomain       string              `json:"cookieDomain"`
-	TelegramBotToken   string              `json:"telegramBotToken"`
-	TelegramChatId     string              `json:"telegramChatId"`
-	PublicAccess       map[string][]string `json:"publicAccess"`
+	Port               int                 `yaml:"port"`
+	Address            string              `yaml:"address"`
+	Name               string              `yaml:"name"`
+	ClientId           string              `yaml:"clientId"`
+	ClientSecret       string              `yaml:"clientSecret"`
+	RedirectUrl        string              `yaml:"redirectUrl"`
+	DefaultRedirectUrl string              `yaml:"defaultRedirectUrl"`
+	Logins             []string            `yaml:"logins"`
+	CookieKey          string              `yaml:"cookieKey"`
+	CookieSecret       string              `yaml:"cookieSecret"`
+	CookieSalt         string              `yaml:"cookieSalt"`
+	CookieMaxAge       int                 `yaml:"cookieMaxAge"`
+	CookieDomain       string              `yaml:"cookieDomain"`
+	TelegramBotToken   string              `yaml:"telegramBotToken"`
+	TelegramChatId     string              `yaml:"telegramChatId"`
+	PublicAccess       map[string][]string `yaml:"publicAccess"`
 
-	compiledPublicAccess map[string][]glob.Glob
+	сompiledPublicAccess map[string][]glob.Glob
 }
 
 var APP_ID = "com.rndnm.goauth"
@@ -81,7 +81,7 @@ func LoadConfig() Config {
 			}
 		}
 	} else {
-		if err := json.Unmarshal(data, &config); err != nil {
+		if err := yaml.Unmarshal(data, &config); err != nil {
 			log.Println("Load config error", err)
 		}
 	}
@@ -93,7 +93,7 @@ func LoadConfig() Config {
 
 func SaveConfig(config Config) error {
 	path := getConfigPath()
-	if data, err := json.MarshalIndent(config, "", "  "); err == nil {
+	if data, err := yaml.Marshal(config); err == nil {
 		reader := bytes.NewReader(data)
 		err = atomic.WriteFile(path, reader)
 		return err
@@ -103,7 +103,7 @@ func SaveConfig(config Config) error {
 
 func getConfigPath() string {
 	place := GetProfilePath()
-	return filepath.Join(place, "config.json")
+	return filepath.Join(place, "config.yaml")
 }
 
 var PROFILE_PATH_CACHE string
@@ -153,7 +153,7 @@ func GetStoragePath() string {
 }
 
 func (s *Config) CompileGlobs() {
-	s.compiledPublicAccess = make(map[string][]glob.Glob)
+	s.сompiledPublicAccess = make(map[string][]glob.Glob)
 	for host, patterns := range s.PublicAccess {
 		for _, p := range patterns {
 			g, err := glob.Compile(p)
@@ -161,7 +161,7 @@ func (s *Config) CompileGlobs() {
 				log.Printf("Error compiling glob '%s' for host '%s': %v", p, host, err)
 				continue
 			}
-			s.compiledPublicAccess[host] = append(s.compiledPublicAccess[host], g)
+			s.сompiledPublicAccess[host] = append(s.сompiledPublicAccess[host], g)
 		}
 	}
 }

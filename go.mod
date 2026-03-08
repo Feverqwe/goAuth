@@ -4,8 +4,8 @@ go 1.23.6
 
 require (
 	github.com/NYTimes/gziphandler v1.1.1
+	github.com/gobwas/glob v0.2.3
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/natefinch/atomic v1.0.1
+	gopkg.in/yaml.v3 v3.0.1
 )
-
-require github.com/gobwas/glob v0.2.3 // indirect

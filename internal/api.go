@@ -68,7 +68,7 @@ func handleAction(router *Router, config *Config) {
 		}
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		b := base64.StdEncoding.EncodeToString(
-			fmt.Appendf(nil, "%s:%s", config.ClientId, config.ClientSecter),
+			fmt.Appendf(nil, "%s:%s", config.ClientId, config.ClientSecret),
 		)
 		req.Header.Add("Authorization", fmt.Sprintf("Basic %s", b))
 
@@ -217,7 +217,7 @@ func handleAction(router *Router, config *Config) {
 		}
 
 		isPublic := func(host string) bool {
-			if globs, ok := config.compiledPublicAccess[host]; ok {
+			if globs, ok := config.сompiledPublicAccess[host]; ok {
 				for _, g := range globs {
 					if g.Match(uri) {
 						return true

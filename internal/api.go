@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"slices"
@@ -199,7 +200,45 @@ func handleAction(router *Router, config *Config) {
 	}
 
 	cache := expirable.NewLRU[string, bool](128, nil, time.Hour)
+	publicCache := expirable.NewLRU[string, struct{}](1024, nil, time.Minute*10)
 	router.All("/auth", func(w http.ResponseWriter, r *http.Request) {
+		host := r.Header.Get("X-Original-Host")
+		if host == "" {
+			host = r.Host
+		}
+
+		if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
+
+		uri := r.Header.Get("X-Original-URI")
+		if uri == "" {
+			uri = r.URL.Path
+		}
+
+		isPublic := func(host string) bool {
+			if globs, ok := config.compiledPublicAccess[host]; ok {
+				for _, g := range globs {
+					if g.Match(uri) {
+						return true
+					}
+				}
+			}
+			return false
+		}
+
+		cacheKey := host + uri
+		if _, found := publicCache.Get(cacheKey); found {
+			w.WriteHeader(200)
+			return
+		}
+
+		if isPublic(host) || isPublic("*") {
+			publicCache.Add(cacheKey, struct{}{})
+			w.WriteHeader(200)
+			return
+		}
+
 		ok := false
 		cookies := r.Cookies()
 		for _, c := range cookies {

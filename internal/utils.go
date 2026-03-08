@@ -40,3 +40,18 @@ func UnsignCookie(payloadHash string, secret string, salt string, ttl int) (payl
 	ok = SignCookie(payload, tsStr, secret, salt) == payloadHash
 	return
 }
+
+func matchPublicPath(requestPath string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if requestPath == pattern {
+			return true
+		}
+		if strings.HasSuffix(pattern, "*") {
+			prefix := strings.TrimSuffix(pattern, "*")
+			if strings.HasPrefix(requestPath, prefix) {
+				return true
+			}
+		}
+	}
+	return false
+}

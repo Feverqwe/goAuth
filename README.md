@@ -1,109 +1,77 @@
-# GoAuth - Сервис авторизации через Yandex OAuth
+# GoAuth - Yandex OAuth Authorization Service
 
-## Описание
+## Description
 
-GoAuth - это сервер авторизации на Go, который интегрируется с Nginx через модуль `auth_request`. Сервис предоставляет возможность аутентификации пользователей через Yandex OAuth и управление доступом на основе списка разрешенных логинов.
+GoAuth is an authentication proxy for Go, designed to integrate with Nginx via the `auth_request` module. It provides Yandex OAuth authentication and access control based on a whitelist of allowed logins and flexible public path patterns.
 
-## Основные возможности
+## Key Features
 
-- Аутентификация через Yandex OAuth
-- Интеграция с Nginx через auth_request
-- Уведомления о новых входах через Telegram
-- Управление списком разрешенных пользователей
-- Подпись и проверка cookies для сессий
+- **Yandex OAuth**: External authentication provider.
+- **Nginx Integration**: Works as an external authorizer via `auth_request`.
+- **Public Access**: Support for domain-specific **glob patterns** (e.g., `/static/**`).
+- **High Performance**: Dual **LRU caching** (for sessions and public paths).
+- **Secure Sessions**: HMAC-SHA256 signed cookies with TTL.
+- **Notifications**: Login alerts via Telegram.
+- **YAML Config**: Easy to read and maintain configuration.
 
-## Конфигурация Nginx
-
-Пример конфигурации Nginx для работы с GoAuth:
+## Nginx Configuration
 
 ```nginx
 server {
   listen 443 ssl;
   listen [::]:443 ssl;
-
-  server_name example.com;
+  server_name app.example.com;
 
   location / {
     auth_request /auth;
     error_page 401 =307 https://auth.example.com/?origin=$scheme://$host$request_uri;
-
     proxy_pass http://backend;
   }
 
   location /auth {
-      internal;
-      proxy_pass http://goauth:8044;
-      proxy_pass_request_body off;
-      proxy_set_header Content-Length "";
-      proxy_set_header X-Original-URI $request_uri;
-      proxy_set_header X-Original-Host $host;
+    internal;
+    proxy_pass http://goauth:8044;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header X-Original-URI $request_uri;
+    proxy_set_header X-Original-Host $host;
   }
 }
 ```
 
-## Конфигурация GoAuth
+## GoAuth Configuration (config.yaml)
 
-Конфигурационный файл `config.json` содержит следующие параметры:
-
-```json
-{
-  "port": 8044,
-  "address": "0.0.0.0",
-  "name": "Auth",
-  "clientId": "your_yandex_client_id",
-  "clientSecret": "your_yandex_client_secret",
-  "redirectUrl": "https://auth.example.com/callback",
-  "defaultRedirectUrl": "https://example.com",
-  "logins": ["allowed_user1", "allowed_user2"],
-  "cookieKey": "auth_token",
-  "cookieSecret": "secure_secret",
-  "cookieSalt": "secure_salt",
-  "cookieMaxAge": 7884000,
-  "cookieDomain": ".example.com",
-  "telegramBotToken": "your_bot_token",
-  "telegramChatId": "your_chat_id"
-}
-```
-
-## Запуск через Docker
-
-1. Соберите образ:
-```bash
-docker build -t goauth .
-```
-
-2. Запустите контейнер:
-```bash
-docker run -d \
-  -p 8044:8044 \
-  -v /path/to/config:/config \
-  --name goauth \
-  goauth
-```
-
-## Локальная разработка
-
-Для сборки и запуска локально:
-
-```bash
-# Сборка
-./scripts/build.sh
-
-# Запуск
-./scripts/run.sh
+```yaml
+port: 8044
+address: 0.0.0.0
+name: Auth
+clientId: "your_yandex_client_id"
+clientSecret: "your_yandex_client_secret"
+redirectUrl: "https://auth.example.com/callback"
+defaultRedirectUrl: "https://example.com"
+logins:
+  - "admin_user"
+cookieKey: "auth_token"
+cookieSecret: "secure_secret"
+cookieSalt: "secure_salt"
+cookieMaxAge: 7884000
+cookieDomain: ".example.com"
+publicAccess:
+  "api.example.com":
+    - "/v1/public/**"
+  "*":
+    - "/favicon.ico"
+    - "/robots.txt"
+telegramBotToken: "your_bot_token"
+telegramChatId: "your_chat_id"
 ```
 
 ## API Endpoints
 
-- `/auth` - Проверка авторизации (используется Nginx)
-- `/` - Перенаправление на Yandex OAuth
-- `/callback` - Обработчик callback от Yandex OAuth
+- `/auth` - Authorization check (used by Nginx)
+- `/` - Redirect to Yandex OAuth
+- `/callback` - Handler for Yandex OAuth response
 
-## Зависимости
-
-- Go 1.23+
-- Docker (для контейнеризации)
-
-## Лицензия
+## License
 
 MIT

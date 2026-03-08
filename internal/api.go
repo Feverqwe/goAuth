@@ -191,7 +191,7 @@ func handleAction(router *Router, config *Config) {
 		}
 
 		if !payload.Ok {
-			err = errors.New(fmt.Sprintf("Telegram error: %s", payload.Description))
+			err = fmt.Errorf("Telegram error: %s", payload.Description)
 			return
 		}
 

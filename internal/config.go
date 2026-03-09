@@ -40,15 +40,7 @@ func (s *Config) GetAddress() string {
 	return s.Address + ":" + strconv.Itoa(s.Port)
 }
 
-func (s *Config) GetBrowserAddress() string {
-	addr := s.Address
-	if addr == "" {
-		addr = "127.0.0.1"
-	}
-	return "http://" + addr + ":" + strconv.Itoa(s.Port)
-}
-
-func (s *Config) CompileGlobs() {
+func (s *Config) compileGlobs() {
 	s.сompiledPublicAccess = make(map[string][]glob.Glob)
 	for host, patterns := range s.PublicAccess {
 		for _, p := range patterns {
@@ -109,7 +101,7 @@ func LoadConfig() Config {
 		}
 	}
 
-	config.CompileGlobs()
+	config.compileGlobs()
 
 	return config
 }

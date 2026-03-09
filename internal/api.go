@@ -204,7 +204,7 @@ func handleAction(router *Router, config *Config) {
 	router.All("/auth", func(w http.ResponseWriter, r *http.Request) {
 		host := r.Header.Get("X-Original-Host")
 		rawUri := r.Header.Get("X-Original-URI")
-		if host != "" && rawUri != "" {
+		if host != "" {
 			if h, _, err := net.SplitHostPort(host); err == nil {
 				host = h
 			}

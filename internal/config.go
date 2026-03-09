@@ -48,6 +48,31 @@ func (s *Config) GetBrowserAddress() string {
 	return "http://" + addr + ":" + strconv.Itoa(s.Port)
 }
 
+func (s *Config) CompileGlobs() {
+	s.сompiledPublicAccess = make(map[string][]glob.Glob)
+	for host, patterns := range s.PublicAccess {
+		for _, p := range patterns {
+			g, err := glob.Compile(p)
+			if err != nil {
+				log.Printf("Error compiling glob '%s' for host '%s': %v", p, host, err)
+				continue
+			}
+			s.сompiledPublicAccess[host] = append(s.сompiledPublicAccess[host], g)
+		}
+	}
+}
+
+func (s *Config) IsPublic(host, path string) bool {
+	if globs, ok := s.сompiledPublicAccess[host]; ok {
+		for _, g := range globs {
+			if g.Match(path) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func getNewConfig() Config {
 	var config = Config{
 		Port:               80,
@@ -148,18 +173,4 @@ func getDefaultProfilePath() string {
 func GetStoragePath() string {
 	place := GetProfilePath()
 	return filepath.Join(place, "storage.json")
-}
-
-func (s *Config) CompileGlobs() {
-	s.сompiledPublicAccess = make(map[string][]glob.Glob)
-	for host, patterns := range s.PublicAccess {
-		for _, p := range patterns {
-			g, err := glob.Compile(p)
-			if err != nil {
-				log.Printf("Error compiling glob '%s' for host '%s': %v", p, host, err)
-				continue
-			}
-			s.сompiledPublicAccess[host] = append(s.сompiledPublicAccess[host], g)
-		}
-	}
 }

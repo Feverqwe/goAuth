@@ -203,40 +203,31 @@ func handleAction(router *Router, config *Config) {
 	publicCache := expirable.NewLRU[string, struct{}](1024, nil, time.Minute*10)
 	router.All("/auth", func(w http.ResponseWriter, r *http.Request) {
 		host := r.Header.Get("X-Original-Host")
-		if host == "" {
-			host = r.Host
-		}
-
-		if h, _, err := net.SplitHostPort(host); err == nil {
-			host = h
-		}
-
-		uri := r.Header.Get("X-Original-URI")
-		if uri == "" {
-			uri = r.URL.Path
-		}
-
-		isPublic := func(host string) bool {
-			if globs, ok := config.сompiledPublicAccess[host]; ok {
-				for _, g := range globs {
-					if g.Match(uri) {
-						return true
-					}
-				}
+		rawUri := r.Header.Get("X-Original-URI")
+		if host != "" && rawUri != "" {
+			if h, _, err := net.SplitHostPort(host); err == nil {
+				host = h
 			}
-			return false
-		}
 
-		cacheKey := host + uri
-		if _, found := publicCache.Get(cacheKey); found {
-			w.WriteHeader(200)
-			return
-		}
+			parsedUri, err := url.Parse(rawUri)
+			if err != nil {
+				log.Printf("Security alert: Malformed URI '%s' from %s: %v", rawUri, r.RemoteAddr, err)
+				w.WriteHeader(400)
+				return
+			}
+			path := parsedUri.Path
 
-		if isPublic(host) || isPublic("*") {
-			publicCache.Add(cacheKey, struct{}{})
-			w.WriteHeader(200)
-			return
+			cacheKey := host + path
+			if _, found := publicCache.Get(cacheKey); found {
+				w.WriteHeader(200)
+				return
+			}
+
+			if config.IsPublic(host, path) || config.IsPublic("*", path) {
+				publicCache.Add(cacheKey, struct{}{})
+				w.WriteHeader(200)
+				return
+			}
 		}
 
 		ok := false

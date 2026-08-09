@@ -23,6 +23,14 @@ func SignCookie(payload string, ts string, secret string, salt string) (payloadH
 }
 
 func UnsignCookie(payloadHash string, secret string, salt string, ttl int) (payload string, ok bool) {
+	payload, _, ok = UnsignCookieWithExpiration(payloadHash, secret, salt, ttl)
+	return
+}
+
+func UnsignCookieWithExpiration(payloadHash string, secret string, salt string, ttl int) (payload string, expiresAt time.Time, ok bool) {
+	if ttl <= 0 {
+		return
+	}
 	p := strings.SplitN(payloadHash, ".", 3)
 	if len(p) != 3 {
 		return
@@ -34,10 +42,15 @@ func UnsignCookie(payloadHash string, secret string, salt string, ttl int) (payl
 		return
 	}
 	now := time.Now().UnixMilli()
-	if now-ts > int64(ttl)*1000 {
+	expiresAtMillis := ts + int64(ttl)*1000
+	if ts > now || expiresAtMillis <= ts || now >= expiresAtMillis {
 		return
 	}
-	ok = SignCookie(payload, tsStr, secret, salt) == payloadHash
+	if !hmac.Equal([]byte(SignCookie(payload, tsStr, secret, salt)), []byte(payloadHash)) {
+		return
+	}
+	expiresAt = time.UnixMilli(expiresAtMillis)
+	ok = true
 	return
 }
 

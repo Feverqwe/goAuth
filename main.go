@@ -7,7 +7,10 @@ import (
 )
 
 func main() {
-	config := internal.LoadConfig()
+	config, err := internal.LoadConfig()
+	if err != nil {
+		log.Fatal("Load config: ", err)
+	}
 
 	router := internal.NewRouter()
 
@@ -22,7 +25,7 @@ func main() {
 		Handler: router,
 	}
 
-	err := httpServer.ListenAndServe()
+	err = httpServer.ListenAndServe()
 	if err != nil {
 		panic(err)
 	}

@@ -28,6 +28,11 @@ type JsonSuccessResponse struct {
 	Result any `json:"result"`
 }
 
+type authCacheEntry struct {
+	authorized bool
+	expiresAt  time.Time
+}
+
 func HandleApi(router *Router, config *Config) {
 	apiRouter := NewRouter()
 	gzipHandler := gziphandler.GzipHandler(apiRouter)
@@ -199,7 +204,7 @@ func handleAction(router *Router, config *Config) {
 		return
 	}
 
-	cache := expirable.NewLRU[string, bool](128, nil, time.Hour)
+	cache := expirable.NewLRU[string, authCacheEntry](128, nil, time.Hour)
 	publicCache := expirable.NewLRU[string, struct{}](1024, nil, time.Minute*10)
 	router.All("/auth", func(w http.ResponseWriter, r *http.Request) {
 		host := r.Header.Get("X-Original-Host")
@@ -212,6 +217,11 @@ func handleAction(router *Router, config *Config) {
 			parsedUri, err := url.Parse(rawUri)
 			if err != nil {
 				log.Printf("Security alert: Malformed URI '%s' from %s: %v", rawUri, r.RemoteAddr, err)
+				w.WriteHeader(400)
+				return
+			}
+			if hasEncodedPathSeparator(parsedUri.EscapedPath()) {
+				log.Printf("Security alert: Encoded path separator in URI '%s' from %s", rawUri, r.RemoteAddr)
 				w.WriteHeader(400)
 				return
 			}
@@ -237,13 +247,19 @@ func handleAction(router *Router, config *Config) {
 				continue
 			}
 			if cachedResult, found := cache.Get(c.Value); found {
-				ok = cachedResult
-				break
+				if cachedResult.expiresAt.IsZero() || time.Now().Before(cachedResult.expiresAt) {
+					ok = cachedResult.authorized
+					break
+				}
+				cache.Remove(c.Value)
 			}
-			if login, valid := UnsignCookie(c.Value, config.CookieSecret, config.CookieSalt, config.CookieMaxAge); valid {
+			entry := authCacheEntry{}
+			if login, expiresAt, valid := UnsignCookieWithExpiration(c.Value, config.CookieSecret, config.CookieSalt, config.CookieMaxAge); valid {
 				ok = slices.Contains(config.Logins, login)
+				entry.expiresAt = expiresAt
 			}
-			cache.Add(c.Value, ok)
+			entry.authorized = ok
+			cache.Add(c.Value, entry)
 			break
 		}
 
@@ -315,6 +331,24 @@ func handleAction(router *Router, config *Config) {
 
 		w.WriteHeader(403)
 	})
+}
+
+func hasEncodedPathSeparator(escapedPath string) bool {
+	for range 8 {
+		lowerPath := strings.ToLower(escapedPath)
+		if strings.Contains(lowerPath, "%2f") || strings.Contains(lowerPath, "%5c") {
+			return true
+		}
+
+		decodedPath, err := url.PathUnescape(escapedPath)
+		if err != nil || decodedPath == escapedPath {
+			return false
+		}
+		escapedPath = decodedPath
+	}
+
+	// Excessively nested escaping is ambiguous across proxies and backends.
+	return strings.Contains(escapedPath, "%")
 }
 
 func writeApiResult(w http.ResponseWriter, result interface{}, err error) error {

@@ -52,8 +52,8 @@ defaultRedirectUrl: "https://example.com"
 logins:
   - "admin_user"
 cookieKey: "auth_token"
-cookieSecret: "secure_secret"
-cookieSalt: "secure_salt"
+cookieSecret: "replace_with_at_least_32_random_characters"
+cookieSalt: "replace_with_at_least_16_random_characters"
 cookieMaxAge: 7884000
 cookieDomain: ".example.com"
 publicAccess:
@@ -65,6 +65,10 @@ publicAccess:
 telegramBotToken: "your_bot_token"
 telegramChatId: "your_chat_id"
 ```
+
+On the first start GoAuth creates a config with random cookie credentials and exits.
+Fill in the required values before restarting it. Existing configs with missing or
+weak cookie credentials are rejected instead of starting with unsafe defaults.
 
 ## API Endpoints
 

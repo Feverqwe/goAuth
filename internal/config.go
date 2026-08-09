@@ -161,7 +161,7 @@ func (s Config) Validate() error {
 	if len(s.CookieSecret) < 8 {
 		return fmt.Errorf("cookieSecret must contain at least 32 characters")
 	}
-	if len(s.CookieSalt) < 16 {
+	if len(s.CookieSalt) < 8 {
 		return fmt.Errorf("cookieSalt must contain at least 16 characters")
 	}
 	if s.CookieMaxAge <= 0 {

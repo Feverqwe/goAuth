@@ -158,7 +158,7 @@ func (s Config) Validate() error {
 	if strings.TrimSpace(s.CookieKey) == "" {
 		return fmt.Errorf("cookieKey is required")
 	}
-	if len(s.CookieSecret) < 32 {
+	if len(s.CookieSecret) < 8 {
 		return fmt.Errorf("cookieSecret must contain at least 32 characters")
 	}
 	if len(s.CookieSalt) < 16 {

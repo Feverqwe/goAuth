@@ -159,10 +159,10 @@ func (s Config) Validate() error {
 		return fmt.Errorf("cookieKey is required")
 	}
 	if len(s.CookieSecret) < 8 {
-		return fmt.Errorf("cookieSecret must contain at least 32 characters")
+		return fmt.Errorf("cookieSecret must contain at least 8 characters")
 	}
 	if len(s.CookieSalt) < 8 {
-		return fmt.Errorf("cookieSalt must contain at least 16 characters")
+		return fmt.Errorf("cookieSalt must contain at least 8 characters")
 	}
 	if s.CookieMaxAge <= 0 {
 		return fmt.Errorf("cookieMaxAge must be greater than zero")

@@ -2,6 +2,8 @@ package internal
 
 import (
 	"bytes"
+	"context"
+	"crypto/hmac"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -33,6 +35,13 @@ type authCacheEntry struct {
 	expiresAt  time.Time
 }
 
+const (
+	oauthStateCookieName = "__Host-goauth-state"
+	oauthStateTTL        = 10 * time.Minute
+	oauthRequestTimeout  = 10 * time.Second
+	notifyRequestTimeout = 5 * time.Second
+)
+
 func HandleApi(router *Router, config *Config) {
 	apiRouter := NewRouter()
 	gzipHandler := gziphandler.GzipHandler(apiRouter)
@@ -50,6 +59,10 @@ func handleFobidden(router *Router) {
 }
 
 func handleAction(router *Router, config *Config) {
+	handleActionWithClient(router, config, &http.Client{Timeout: oauthRequestTimeout})
+}
+
+func handleActionWithClient(router *Router, config *Config, client *http.Client) {
 	type Token struct {
 		ErrorDescription string `json:"error_description"`
 		Error            string `json:"error"`
@@ -61,13 +74,13 @@ func handleAction(router *Router, config *Config) {
 		Scope        string `json:"scope"`
 	}
 
-	getToken := func(code string) (*Token, error) {
+	getToken := func(ctx context.Context, code string) (*Token, error) {
 		p := fmt.Sprintf("grant_type=%s&code=%s",
 			url.QueryEscape("authorization_code"),
 			url.QueryEscape(code),
 		)
 
-		req, err := http.NewRequest("POST", "https://oauth.yandex.ru/token", bytes.NewBuffer([]byte(p)))
+		req, err := http.NewRequestWithContext(ctx, "POST", "https://oauth.yandex.ru/token", bytes.NewBuffer([]byte(p)))
 		if err != nil {
 			return nil, err
 		}
@@ -77,11 +90,14 @@ func handleAction(router *Router, config *Config) {
 		)
 		req.Header.Add("Authorization", fmt.Sprintf("Basic %s", b))
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			return nil, err
 		}
 		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("OAuth token endpoint returned HTTP %d", resp.StatusCode)
+		}
 
 		contentType := resp.Header.Get("Content-type")
 
@@ -101,6 +117,9 @@ func handleAction(router *Router, config *Config) {
 		if payload.Error != "" {
 			return nil, errors.New(payload.Error)
 		}
+		if payload.AccessToken == "" {
+			return nil, errors.New("OAuth token response is missing access_token")
+		}
 
 		return payload, nil
 	}
@@ -112,21 +131,24 @@ func handleAction(router *Router, config *Config) {
 		Psuid    string `json:"psuid"`
 	}
 
-	getUserInfo := func(token string) (*UserInfo, error) {
+	getUserInfo := func(ctx context.Context, token string) (*UserInfo, error) {
 		l := fmt.Sprintf("https://login.yandex.ru/info?format=%s",
 			url.QueryEscape("json"),
 		)
-		req, err := http.NewRequest("GET", l, nil)
+		req, err := http.NewRequestWithContext(ctx, "GET", l, nil)
 		if err != nil {
 			return nil, err
 		}
 		req.Header.Add("Authorization", fmt.Sprintf("OAuth %s", token))
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			return nil, err
 		}
 		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("OAuth user endpoint returned HTTP %d", resp.StatusCode)
+		}
 
 		contentType := resp.Header.Get("Content-type")
 
@@ -138,6 +160,9 @@ func handleAction(router *Router, config *Config) {
 		payload, err := ParseJson[UserInfo](resp.Body)
 		if err != nil {
 			return nil, err
+		}
+		if payload.Login == "" {
+			return nil, errors.New("OAuth user response is missing login")
 		}
 
 		return payload, nil
@@ -154,7 +179,7 @@ func handleAction(router *Router, config *Config) {
 		Description string `json:"description"`
 	}
 
-	sendNotify := func(i *UserInfo) (err error) {
+	sendNotify := func(ctx context.Context, i *UserInfo) (err error) {
 		if config.TelegramBotToken == "" || config.TelegramChatId == "" {
 			return
 		}
@@ -171,17 +196,20 @@ func handleAction(router *Router, config *Config) {
 		}
 
 		u := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", config.TelegramBotToken)
-		req, err := http.NewRequest("POST", u, bytes.NewBuffer(j))
+		req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewBuffer(j))
 		if err != nil {
 			return
 		}
 		req.Header.Add("Content-Type", "application/json")
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			return
 		}
 		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("Telegram endpoint returned HTTP %d", resp.StatusCode)
+		}
 
 		contentType := resp.Header.Get("Content-type")
 
@@ -206,7 +234,10 @@ func handleAction(router *Router, config *Config) {
 
 	cache := expirable.NewLRU[string, authCacheEntry](128, nil, time.Hour)
 	publicCache := expirable.NewLRU[string, struct{}](1024, nil, time.Minute*10)
+	states := expirable.NewLRU[string, string](1024, nil, oauthStateTTL)
+	notifySlots := make(chan struct{}, 4)
 	router.All("/auth", func(w http.ResponseWriter, r *http.Request) {
+		clientIP := config.ClientIP(r)
 		host := r.Header.Get("X-Original-Host")
 		rawUri := r.Header.Get("X-Original-URI")
 		if host != "" {
@@ -216,18 +247,18 @@ func handleAction(router *Router, config *Config) {
 
 			parsedUri, err := url.Parse(rawUri)
 			if err != nil {
-				log.Printf("Security alert: Malformed URI '%s' from %s: %v", rawUri, r.RemoteAddr, err)
+				log.Printf("Security alert: Malformed URI '%s' from %s: %v", rawUri, clientIP, err)
 				w.WriteHeader(400)
 				return
 			}
-			if hasEncodedPathSeparator(parsedUri.EscapedPath()) {
-				log.Printf("Security alert: Encoded path separator in URI '%s' from %s", rawUri, r.RemoteAddr)
+			if parsedUri.IsAbs() || parsedUri.Host != "" || parsedUri.Fragment != "" || hasUnsafePath(parsedUri.EscapedPath()) {
+				log.Printf("Security alert: Unsafe path in URI '%s' from %s", rawUri, clientIP)
 				w.WriteHeader(400)
 				return
 			}
 			path := parsedUri.Path
 
-			cacheKey := host + path
+			cacheKey := host + "\x00" + path
 			if _, found := publicCache.Get(cacheKey); found {
 				w.WriteHeader(200)
 				return
@@ -238,6 +269,11 @@ func handleAction(router *Router, config *Config) {
 				w.WriteHeader(200)
 				return
 			}
+		}
+
+		if config.IsIPWhitelisted(clientIP) {
+			w.WriteHeader(http.StatusOK)
+			return
 		}
 
 		ok := false
@@ -275,18 +311,28 @@ func handleAction(router *Router, config *Config) {
 		if origin == "" {
 			origin = config.DefaultRedirectUrl
 		}
-		if origin == "" {
-			w.WriteHeader(403)
+		if !config.IsRedirectAllowed(origin) {
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		state, err := randomConfigValue(32)
+		if err != nil {
+			writeApiResult(w, nil, err)
+			return
+		}
+		states.Add(state, origin)
+		http.SetCookie(w, &http.Cookie{
+			Name: oauthStateCookieName, Value: state, Path: "/",
+			MaxAge: int(oauthStateTTL.Seconds()), Secure: true, HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		})
+		w.Header().Set("Cache-Control", "no-store")
 
 		l := fmt.Sprintf("https://oauth.yandex.ru/authorize?response_type=%s&client_id=%s&redirect_uri=%s&state=%s",
 			url.QueryEscape("code"),
 			url.QueryEscape(config.ClientId),
 			url.QueryEscape(config.RedirectUrl),
-			url.QueryEscape(
-				fmt.Sprintf("origin=%s", url.QueryEscape(origin)),
-			),
+			url.QueryEscape(state),
 		)
 		w.Header().Add("Location", l)
 		w.WriteHeader(307)
@@ -297,20 +343,36 @@ func handleAction(router *Router, config *Config) {
 
 		code := query.Get("code")
 		state := query.Get("state")
+		w.Header().Set("Cache-Control", "no-store")
+		cookie, err := r.Cookie(oauthStateCookieName)
+		if err != nil || state == "" || !hmac.Equal([]byte(cookie.Value), []byte(state)) {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		origin, found := states.Get(state)
+		// Remove returns true to only one concurrent callback, making state single-use.
+		if !found || !states.Remove(state) {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name: oauthStateCookieName, Path: "/", MaxAge: -1,
+			Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode,
+		})
+		if code == "" || !config.IsRedirectAllowed(origin) {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), oauthRequestTimeout)
+		defer cancel()
 
-		stateQuery, err := url.ParseQuery(state)
+		p, err := getToken(ctx, code)
 		if err != nil {
 			writeApiResult(w, nil, err)
 			return
 		}
 
-		p, err := getToken(code)
-		if err != nil {
-			writeApiResult(w, nil, err)
-			return
-		}
-
-		i, err := getUserInfo(p.AccessToken)
+		i, err := getUserInfo(ctx, p.AccessToken)
 		if err != nil {
 			writeApiResult(w, nil, err)
 			return
@@ -319,18 +381,56 @@ func handleAction(router *Router, config *Config) {
 		if slices.Contains(config.Logins, i.Login) {
 			ts := strconv.FormatInt(time.Now().UnixMilli(), 10)
 			sigValue := SignCookie(i.Login, ts, config.CookieSecret, config.CookieSalt)
-			w.Header().Add("Set-Cookie", fmt.Sprintf("%s=%s;Max-Age=%s;Domain=%s;Path=/;Secure;HttpOnly", config.CookieKey, sigValue, strconv.Itoa(config.CookieMaxAge), config.CookieDomain))
-			w.Header().Add("Location", stateQuery.Get("origin"))
+			http.SetCookie(w, &http.Cookie{
+				Name: config.CookieKey, Value: sigValue, MaxAge: config.CookieMaxAge,
+				Domain: config.CookieDomain, Path: "/", Secure: true, HttpOnly: true,
+				SameSite: http.SameSiteLaxMode,
+			})
+			w.Header().Set("Location", origin)
 			w.WriteHeader(307)
 
-			if err := sendNotify(i); err != nil {
-				log.Println("Unable send notiy", err)
+			if config.TelegramBotToken != "" && config.TelegramChatId != "" {
+				select {
+				case notifySlots <- struct{}{}:
+					go func() {
+						defer func() { <-notifySlots }()
+						ctx, cancel := context.WithTimeout(context.Background(), notifyRequestTimeout)
+						defer cancel()
+						if err := sendNotify(ctx, i); err != nil {
+							log.Println("Unable to send login notification:", err)
+						}
+					}()
+				default:
+					log.Println("Skipping login notification: all notification slots are busy")
+				}
 			}
 			return
 		}
 
 		w.WriteHeader(403)
 	})
+}
+
+func hasUnsafePath(escapedPath string) bool {
+	if !strings.HasPrefix(escapedPath, "/") || hasEncodedPathSeparator(escapedPath) {
+		return true
+	}
+	for range 8 {
+		if strings.ContainsAny(escapedPath, "\\\x00\r\n") || strings.Contains(escapedPath, "//") {
+			return true
+		}
+		for _, segment := range strings.Split(escapedPath, "/") {
+			if segment == "." || segment == ".." {
+				return true
+			}
+		}
+		decoded, err := url.PathUnescape(escapedPath)
+		if err != nil || decoded == escapedPath {
+			return false
+		}
+		escapedPath = decoded
+	}
+	return true
 }
 
 func hasEncodedPathSeparator(escapedPath string) bool {
@@ -348,7 +448,7 @@ func hasEncodedPathSeparator(escapedPath string) bool {
 	}
 
 	// Excessively nested escaping is ambiguous across proxies and backends.
-	return strings.Contains(escapedPath, "%")
+	return true
 }
 
 func writeApiResult(w http.ResponseWriter, result interface{}, err error) error {

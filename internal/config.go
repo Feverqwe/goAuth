@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"net/url"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -18,23 +18,28 @@ import (
 )
 
 type Config struct {
-	Port               int                 `yaml:"port"`
-	Address            string              `yaml:"address"`
-	ClientId           string              `yaml:"clientId"`
-	ClientSecret       string              `yaml:"clientSecret"`
-	RedirectUrl        string              `yaml:"redirectUrl"`
-	DefaultRedirectUrl string              `yaml:"defaultRedirectUrl"`
-	Logins             []string            `yaml:"logins"`
-	CookieKey          string              `yaml:"cookieKey"`
-	CookieSecret       string              `yaml:"cookieSecret"`
-	CookieSalt         string              `yaml:"cookieSalt"`
-	CookieMaxAge       int                 `yaml:"cookieMaxAge"`
-	CookieDomain       string              `yaml:"cookieDomain"`
-	TelegramBotToken   string              `yaml:"telegramBotToken"`
-	TelegramChatId     string              `yaml:"telegramChatId"`
-	PublicAccess       map[string][]string `yaml:"publicAccess"`
+	Port                   int                 `yaml:"port"`
+	Address                string              `yaml:"address"`
+	ClientId               string              `yaml:"clientId"`
+	ClientSecret           string              `yaml:"clientSecret"`
+	RedirectUrl            string              `yaml:"redirectUrl"`
+	DefaultRedirectUrl     string              `yaml:"defaultRedirectUrl"`
+	AllowedRedirectDomains []string            `yaml:"allowedRedirectDomains"`
+	Logins                 []string            `yaml:"logins"`
+	CookieKey              string              `yaml:"cookieKey"`
+	CookieSecret           string              `yaml:"cookieSecret"`
+	CookieSalt             string              `yaml:"cookieSalt"`
+	CookieMaxAge           int                 `yaml:"cookieMaxAge"`
+	CookieDomain           string              `yaml:"cookieDomain"`
+	TelegramBotToken       string              `yaml:"telegramBotToken"`
+	TelegramChatId         string              `yaml:"telegramChatId"`
+	PublicAccess           map[string][]string `yaml:"publicAccess"`
+	IPWhitelist            []string            `yaml:"ipWhitelist"`
+	TrustedProxies         []string            `yaml:"trustedProxies"`
 
-	сompiledPublicAccess map[string][]glob.Glob
+	сompiledPublicAccess   map[string][]glob.Glob
+	compiledIPWhitelist    []netip.Prefix
+	compiledTrustedProxies []netip.Prefix
 }
 
 var APP_ID = "com.rndnm.goauth"
@@ -132,6 +137,9 @@ func LoadConfig() (Config, error) {
 	if err := config.compileGlobs(); err != nil {
 		return Config{}, err
 	}
+	if err := config.compileIPRules(); err != nil {
+		return Config{}, err
+	}
 
 	return config, nil
 }
@@ -152,6 +160,14 @@ func (s Config) Validate() error {
 	if err := validateHTTPURL("defaultRedirectUrl", s.DefaultRedirectUrl); err != nil {
 		return err
 	}
+	for _, pattern := range s.AllowedRedirectDomains {
+		if _, _, err := parseRedirectDomain(pattern); err != nil {
+			return err
+		}
+	}
+	if !s.IsRedirectAllowed(s.DefaultRedirectUrl) {
+		return fmt.Errorf("defaultRedirectUrl must match allowedRedirectDomains")
+	}
 	if len(s.Logins) == 0 {
 		return fmt.Errorf("at least one login is required")
 	}
@@ -170,13 +186,18 @@ func (s Config) Validate() error {
 	if strings.TrimSpace(s.CookieDomain) == "" {
 		return fmt.Errorf("cookieDomain is required")
 	}
+	if _, err := parseIPRanges("ipWhitelist", s.IPWhitelist); err != nil {
+		return err
+	}
+	if _, err := parseIPRanges("trustedProxies", s.TrustedProxies); err != nil {
+		return err
+	}
 	return nil
 }
 
 func validateHTTPURL(name, value string) error {
-	parsed, err := url.ParseRequestURI(value)
-	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return fmt.Errorf("%s must be an absolute HTTP(S) URL", name)
+	if _, err := parseRedirectURL(value); err != nil {
+		return fmt.Errorf("%s: %w", name, err)
 	}
 	return nil
 }
